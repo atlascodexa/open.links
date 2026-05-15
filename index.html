@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Links</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>Open Links</h1>
+      <p>Crie blocos de links, renomeie-os e abra todos de uma vez.</p>
+    </header>
+
+    <section class="controls">
+      <input id="block-name-input" type="text" placeholder="Nome do bloco (ex: Movidesk)" />
+      <button id="create-block-button">Criar bloco</button>
+    </section>
+
+    <section id="blocks-container" class="blocks-container" aria-live="polite"></section>
+
+    <footer>
+      <p>Os dados são salvos localmente no navegador, acessíveis apenas neste perfil.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
