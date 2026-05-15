@@ -1,15 +1,35 @@
 const STORAGE_KEY = "openLinks.blocks";
 
-const blocksContainer = document.getElementById("blocks-container");
-const createBlockButton = document.getElementById("create-block-button");
-const blockNameInput = document.getElementById("block-name-input");
+let blocks = [];
 
-let blocks = loadBlocks();
+// Gera um id único; usa crypto.randomUUID quando disponível, senão fallback simples
+function uuid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {}
+  }
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+}
 
-document.addEventListener("DOMContentLoaded", renderBlocks);
-createBlockButton.addEventListener("click", createBlock);
-blockNameInput.addEventListener("keypress", (event) => {
-  if (event.key === "Enter") createBlock();
+document.addEventListener("DOMContentLoaded", () => {
+  const blocksContainer = document.getElementById("blocks-container");
+  const createBlockButton = document.getElementById("create-block-button");
+  const blockNameInput = document.getElementById("block-name-input");
+
+  // Load from storage and render
+  blocks = loadBlocks();
+  renderBlocks();
+
+  // Attach UI listeners
+  if (createBlockButton) createBlockButton.addEventListener("click", createBlock);
+  if (blockNameInput)
+    blockNameInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") createBlock();
+    });
+
+  // Expose elements to functions via closures
+  // We'll update renderBlocks to query the container when needed
 });
 
 function loadBlocks() {
@@ -27,24 +47,34 @@ function saveBlocks() {
 }
 
 function createBlock() {
-  const name = blockNameInput.value.trim();
-  if (!name) {
-    blockNameInput.focus();
-    return;
+  try {
+    const input = document.getElementById("block-name-input");
+    const name = (input && input.value && input.value.trim()) || "";
+    if (!name) {
+      if (input) input.focus();
+      return;
+    }
+
+    blocks.push({
+      id: uuid(),
+      name,
+      links: [],
+      collapsed: false,
+    });
+
+    if (input) input.value = "";
+    saveBlocks();
+    renderBlocks();
+  } catch (err) {
+    console.error("Erro ao criar bloco:", err);
+    alert("Ocorreu um erro ao criar o bloco. Abra o console para mais detalhes.");
   }
-
-  blocks.push({
-    id: crypto.randomUUID(),
-    name,
-    links: [],
-  });
-
-  blockNameInput.value = "";
-  saveBlocks();
-  renderBlocks();
 }
 
 function renderBlocks() {
+  const blocksContainer = document.getElementById("blocks-container");
+  if (!blocksContainer) return;
+
   blocksContainer.innerHTML = "";
 
   if (blocks.length === 0) {
@@ -63,19 +93,26 @@ function renderBlocks() {
 
     blockCard.innerHTML = `
       <div class="block-header">
-        <input class="block-title" type="text" value="${escapeHtml(block.name)}" aria-label="Nome do bloco" />
+        <div class="block-title-info">
+          <span class="block-title-text">${escapeHtml(block.name)}</span>
+        </div>
         <div class="block-actions">
           <button class="primary open-all">Abrir links</button>
           <button class="primary add-link">Adicionar link</button>
+          <button class="secondary edit-block" type="button" aria-label="Editar nome do bloco">✏️</button>
+          <button class="secondary toggle-links" type="button">${block.collapsed ? "Ver links" : "Ocultar links"}</button>
           <button class="remove delete-block">Excluir bloco</button>
         </div>
       </div>
-      <ul class="link-list">
+      <ul class="link-list ${block.collapsed ? "collapsed" : ""}">
         ${block.links
           .map(
             (link) => `
               <li class="link-item" data-link-id="${link.id}">
-                <input class="link-url" type="url" value="${escapeHtml(link.url)}" placeholder="https://..." aria-label="URL do link" />
+                <div class="link-fields">
+                  <input class="link-label" type="text" value="${escapeHtml(link.label || "")}" placeholder="Nome do link" aria-label="Nome do link" />
+                  <input class="link-url" type="url" value="${escapeHtml(link.url || "")}" placeholder="https://..." aria-label="URL do link" />
+                </div>
                 <div class="link-actions">
                   <button class="remove remove-link">Excluir</button>
                 </div>
@@ -88,30 +125,41 @@ function renderBlocks() {
 
     blocksContainer.appendChild(blockCard);
 
-    blockCard.querySelector(".block-title").addEventListener("change", (event) => {
-      updateBlockName(block.id, event.target.value);
-    });
-    blockCard.querySelector(".open-all").addEventListener("click", () => openAllLinks(block.id));
-    blockCard.querySelector(".add-link").addEventListener("click", () => addLink(block.id));
-    blockCard.querySelector(".delete-block").addEventListener("click", () => deleteBlock(block.id));
+    const openAllBtn = blockCard.querySelector(".open-all");
+    if (openAllBtn) openAllBtn.addEventListener("click", () => openAllLinks(block.id));
 
-    blockCard.querySelectorAll(".link-url").forEach((input) => {
+    const addLinkBtn = blockCard.querySelector(".add-link");
+    if (addLinkBtn) addLinkBtn.addEventListener("click", () => addLink(block.id));
+
+    const editBlockBtn = blockCard.querySelector(".edit-block");
+    if (editBlockBtn) editBlockBtn.addEventListener("click", () => editBlockName(block.id));
+
+    const toggleLinksBtn = blockCard.querySelector(".toggle-links");
+    if (toggleLinksBtn) toggleLinksBtn.addEventListener("click", () => toggleLinkList(block.id));
+
+    const deleteBlockBtn = blockCard.querySelector(".delete-block");
+    if (deleteBlockBtn) deleteBlockBtn.addEventListener("click", () => deleteBlock(block.id));
+
+    blockCard.querySelectorAll(".link-label").forEach((input) => {
       input.addEventListener("change", (event) => {
-        updateLinkUrl(block.id, input.closest(".link-item").dataset.linkId, event.target.value);
+        const li = input.closest(".link-item");
+        if (!li) return;
+        updateLinkField(block.id, li.dataset.linkId, "label", event.target.value);
       });
     });
 
-    blockCard.querySelectorAll(".open-link").forEach((button) => {
-      button.addEventListener("click", () => {
-        const linkItem = button.closest(".link-item");
-        const linkId = linkItem.dataset.linkId;
-        openLink(block.id, linkId);
+    blockCard.querySelectorAll(".link-url").forEach((input) => {
+      input.addEventListener("change", (event) => {
+        const li = input.closest(".link-item");
+        if (!li) return;
+        updateLinkField(block.id, li.dataset.linkId, "url", event.target.value);
       });
     });
 
     blockCard.querySelectorAll(".remove-link").forEach((button) => {
       button.addEventListener("click", () => {
         const linkItem = button.closest(".link-item");
+        if (!linkItem) return;
         const linkId = linkItem.dataset.linkId;
         removeLink(block.id, linkId);
       });
@@ -127,24 +175,53 @@ function updateBlockName(blockId, value) {
   renderBlocks();
 }
 
+function editBlockName(blockId) {
+  const block = blocks.find((item) => item.id === blockId);
+  if (!block) return;
+
+  const newName = prompt("Editar nome do bloco:", block.name);
+  if (newName === null) return;
+
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    alert("O nome do bloco não pode ficar vazio.");
+    return;
+  }
+
+  block.name = trimmed;
+  saveBlocks();
+  renderBlocks();
+}
+
+function toggleLinkList(blockId) {
+  const block = blocks.find((item) => item.id === blockId);
+  if (!block) return;
+  block.collapsed = !block.collapsed;
+  saveBlocks();
+  renderBlocks();
+}
+
 function addLink(blockId) {
   const block = blocks.find((item) => item.id === blockId);
   if (!block) return;
 
   block.links.push({
-    id: crypto.randomUUID(),
+    id: uuid(),
+    label: "",
     url: "",
   });
   saveBlocks();
   renderBlocks();
 }
 
-function updateLinkUrl(blockId, linkId, value) {
+function updateLinkField(blockId, linkId, field, value) {
   const block = blocks.find((item) => item.id === blockId);
   if (!block) return;
   const link = block.links.find((entry) => entry.id === linkId);
   if (!link) return;
-  link.url = value.trim();
+
+  if (field !== "label" && field !== "url") return;
+  link[field] = value.trim();
   saveBlocks();
 }
 
@@ -175,10 +252,13 @@ function openAllLinks(blockId) {
   const confirmed = confirm(`Abrir ${validLinks.length} links do bloco '${block.name}'?`);
   if (!confirmed) return;
 
-  validLinks.forEach((url) => {
+  validLinks.forEach((url, index) => {
     try {
       const normalized = normalizeUrl(url);
-      window.open(normalized, "_blank", "noopener,noreferrer");
+      // Adiciona um pequeno delay entre as aberturas para evitar bloqueio de popups do navegador
+      setTimeout(() => {
+        window.open(normalized, "_blank", "noopener,noreferrer");
+      }, index * 100);
     } catch (error) {
       console.warn("URL inválida", url, error);
     }
