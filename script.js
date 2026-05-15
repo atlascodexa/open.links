@@ -252,13 +252,10 @@ function openAllLinks(blockId) {
   const confirmed = confirm(`Abrir ${validLinks.length} links do bloco '${block.name}'?`);
   if (!confirmed) return;
 
-  validLinks.forEach((url, index) => {
+  validLinks.forEach((url) => {
     try {
       const normalized = normalizeUrl(url);
-      // Adiciona um pequeno delay entre as aberturas para evitar bloqueio de popups do navegador
-      setTimeout(() => {
-        window.open(normalized, "_blank", "noopener,noreferrer");
-      }, index * 100);
+      window.open(normalized, "_blank", "noopener,noreferrer");
     } catch (error) {
       console.warn("URL inválida", url, error);
     }
