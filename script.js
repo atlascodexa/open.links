@@ -99,9 +99,9 @@ function renderBlocks() {
         <div class="block-actions">
           <button class="primary open-all">Abrir links</button>
           <button class="primary add-link">Adicionar link</button>
-          <button class="secondary edit-block" type="button" aria-label="Editar nome do bloco">✏️</button>
           <button class="secondary toggle-links" type="button">${block.collapsed ? "Ver links" : "Ocultar links"}</button>
-          <button class="remove delete-block">Excluir bloco</button>
+          <button class="secondary edit-block" type="button" aria-label="Editar nome do bloco">✏️</button>
+          <button class="remove delete-block">❌</button>
         </div>
       </div>
       <ul class="link-list ${block.collapsed ? "collapsed" : ""}">
