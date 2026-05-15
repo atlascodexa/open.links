@@ -27,9 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
     blockNameInput.addEventListener("keypress", (event) => {
       if (event.key === "Enter") createBlock();
     });
-
-  // Expose elements to functions via closures
-  // We'll update renderBlocks to query the container when needed
 });
 
 function loadBlocks() {
@@ -99,8 +96,8 @@ function renderBlocks() {
         <div class="block-actions">
           <button class="primary open-all">Abrir links</button>
           <button class="primary add-link">Adicionar link</button>
+          <button class="secondary edit-block">Editar Nome</button>
           <button class="secondary toggle-links" type="button">${block.collapsed ? "Ver links" : "Ocultar links"}</button>
-          <button class="secondary edit-block" type="button" aria-label="Editar nome do bloco">✏️</button>
           <button class="remove delete-block">❌</button>
         </div>
       </div>
@@ -249,13 +246,17 @@ function openAllLinks(blockId) {
     return;
   }
 
-  const confirmed = confirm(`Abrir ${validLinks.length} links do bloco '${block.name}'?`);
+  const confirmed = confirm(`Abrir ${validLinks.length} links do bloco '${block.name}'?\n\n(Nota: Se apenas o primeiro link abrir, verifique a barra de endereços do seu navegador e autorize a abertura de pop-ups para este site).`);
   if (!confirmed) return;
 
   validLinks.forEach((url) => {
     try {
       const normalized = normalizeUrl(url);
-      window.open(normalized, "_blank", "noopener,noreferrer");
+      const newWindow = window.open(normalized, "_blank", "noopener,noreferrer");
+      
+      if (!newWindow) {
+        console.warn("O pop-up para a URL foi bloqueado pelo navegador:", url);
+      }
     } catch (error) {
       console.warn("URL inválida", url, error);
     }
