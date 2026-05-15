@@ -77,7 +77,6 @@ function renderBlocks() {
               <li class="link-item" data-link-id="${link.id}">
                 <input class="link-url" type="url" value="${escapeHtml(link.url)}" placeholder="https://..." aria-label="URL do link" />
                 <div class="link-actions">
-                  <button class="primary open-link">Abrir</button>
                   <button class="remove remove-link">Excluir</button>
                 </div>
               </li>
