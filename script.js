@@ -49,12 +49,6 @@ function createBlock() {
     const name = (input && input.value && input.value.trim()) || "";
     if (!name) {
       if (input) input.focus();
-        input.classList.add("input-error");
-        input.addEventListener("input", function removeError() {
-          input.classList.remove("input-error");
-          input.removeEventListener("input", removeError);
-        });
-        // ----------------------------------
       }
       return;
     }
