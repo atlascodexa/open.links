@@ -23,10 +23,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Attach UI listeners
   if (createBlockButton) createBlockButton.addEventListener("click", createBlock);
-  if (blockNameInput)
+  if (blockNameInput) {
     blockNameInput.addEventListener("keypress", (event) => {
       if (event.key === "Enter") createBlock();
     });
+    blockNameInput.addEventListener("input", () => {
+      blockNameInput.classList.remove("invalid");
+    });
+  }
 
   // Expose elements to functions via closures
   // We'll update renderBlocks to query the container when needed
@@ -51,9 +55,14 @@ function createBlock() {
     const input = document.getElementById("block-name-input");
     const name = (input && input.value && input.value.trim()) || "";
     if (!name) {
-      if (input) input.focus();
+      if (input) {
+        input.classList.add("invalid");
+        input.focus();
+      }
       return;
     }
+
+    if (input) input.classList.remove("invalid");
 
     blocks.push({
       id: uuid(),
