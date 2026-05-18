@@ -14,7 +14,3 @@ Ideal para organizar links para cada tipo de demanda, e abrir links em massa par
 - Botão "Abrir links" para abrir todos os links do bloco em novas abas.
 - Cache local usando `localStorage`, preservando os dados apenas neste perfil de navegador.
 - Separação clara entre HTML, CSS e JavaScript.
-
-## Observação LGPD
-
-Os dados são salvos apenas no navegador do usuário. Cada pessoa que acessar deve usar seu próprio perfil ou navegador para manter privacidade entre acessos.
