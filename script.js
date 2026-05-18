@@ -1,9 +1,10 @@
-const STORAGE_KEY = "openLinks.storage";
+const STORAGE_KEY = "openLinks.users";
+const CURRENT_USER_KEY = "openLinks.currentUser";
 const STORAGE_VERSION = 1;
 
 let blocks = [];
+let currentUserEmail = null;
 
-// Gera um id único; usa crypto.randomUUID quando disponível, senão fallback simples
 function uuid() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     try {
@@ -14,15 +15,20 @@ function uuid() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const blocksContainer = document.getElementById("blocks-container");
   const createBlockButton = document.getElementById("create-block-button");
   const blockNameInput = document.getElementById("block-name-input");
+  const authOpenButton = document.getElementById("auth-open-button");
+  const logoutButton = document.getElementById("logout-button");
+  const loginButton = document.getElementById("login-button");
+  const signupButton = document.getElementById("signup-button");
+  const authForm = document.getElementById("auth-form");
 
-  // Load from storage and render
+  currentUserEmail = loadCurrentUserEmail();
+  renderAuthState();
+
   blocks = loadBlocks();
   renderBlocks();
 
-  // Attach UI listeners
   if (createBlockButton) createBlockButton.addEventListener("click", createBlock);
   if (blockNameInput) {
     blockNameInput.addEventListener("keypress", (event) => {
@@ -33,28 +39,180 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Expose elements to functions via closures
-  // We'll update renderBlocks to query the container when needed
+  if (authOpenButton) {
+    authOpenButton.addEventListener("click", () => {
+      if (authForm) authForm.classList.toggle("hidden");
+    });
+  }
+
+  if (logoutButton) {
+    logoutButton.addEventListener("click", logout);
+  }
+
+  if (loginButton) {
+    loginButton.addEventListener("click", () => authenticateUser(false));
+  }
+
+  if (signupButton) {
+    signupButton.addEventListener("click", () => authenticateUser(true));
+  }
 });
 
-function loadBlocks() {
+function getAllUsers() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
+    if (!stored) return {};
     const parsed = JSON.parse(stored);
-    const migrated = migrateStoredData(parsed);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch (error) {
+    console.warn("Erro ao carregar contas de usuário", error);
+  }
+  return {};
+}
 
-    blocks = migrated.blocks;
-    if (!isCurrentStorageFormat(parsed)) {
-      saveBlocks();
+function saveAllUsers(users) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+}
+
+function loadCurrentUserEmail() {
+  return localStorage.getItem(CURRENT_USER_KEY);
+}
+
+function saveCurrentUserEmail(email) {
+  localStorage.setItem(CURRENT_USER_KEY, email);
+}
+
+function clearCurrentUserEmail() {
+  localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function getCurrentUserRecord() {
+  const email = loadCurrentUserEmail();
+  if (!email) return null;
+  const users = getAllUsers();
+  return users[email.toLowerCase()] || null;
+}
+
+function renderAuthState() {
+  const authStatus = document.getElementById("auth-status");
+  const createBlockButton = document.getElementById("create-block-button");
+  const blockNameInput = document.getElementById("block-name-input");
+  const authForm = document.getElementById("auth-form");
+  const logoutButton = document.getElementById("logout-button");
+
+  if (currentUserEmail) {
+    if (authStatus) authStatus.textContent = `Conectado como ${currentUserEmail}`;
+    if (createBlockButton) createBlockButton.disabled = false;
+    if (blockNameInput) blockNameInput.disabled = false;
+    if (authForm) authForm.classList.add("hidden");
+    if (logoutButton) logoutButton.classList.remove("hidden");
+  } else {
+    if (authStatus) authStatus.textContent = "Não conectado";
+    if (createBlockButton) createBlockButton.disabled = true;
+    if (blockNameInput) blockNameInput.disabled = true;
+    if (logoutButton) logoutButton.classList.add("hidden");
+  }
+}
+
+async function authenticateUser(isSignUp) {
+  const emailInput = document.getElementById("auth-email");
+  const passwordInput = document.getElementById("auth-password");
+
+  if (!emailInput || !passwordInput) return;
+
+  const email = (emailInput.value || "").trim().toLowerCase();
+  const password = passwordInput.value || "";
+
+  if (!email || !password) {
+    alert("Digite um e-mail e senha para continuar.");
+    return;
+  }
+
+  try {
+    const passwordHash = await hashString(password);
+    const users = getAllUsers();
+    const existingUser = users[email];
+
+    if (isSignUp) {
+      if (existingUser) {
+        alert("Já existe uma conta para esse e-mail. Faça login.");
+        return;
+      }
+
+      users[email] = {
+        email,
+        passwordHash,
+        blocks: {
+          version: STORAGE_VERSION,
+          blocks: [],
+        },
+      };
+      saveAllUsers(users);
+      currentUserEmail = email;
+      saveCurrentUserEmail(email);
+      blocks = [];
+      renderAuthState();
+      renderBlocks();
+      alert("Conta criada com sucesso. Seus blocos agora serão salvos.");
+      return;
     }
 
-    return blocks;
+    if (!existingUser || existingUser.passwordHash !== passwordHash) {
+      alert("E-mail ou senha incorretos. Tente novamente.");
+      return;
+    }
+
+    currentUserEmail = email;
+    saveCurrentUserEmail(email);
+    blocks = loadBlocks();
+    renderAuthState();
+    renderBlocks();
+    alert("Login realizado com sucesso.");
   } catch (error) {
-    console.warn("Erro ao carregar cache local", error);
-    return [];
+    console.error("Erro de autenticação:", error);
+    alert("Ocorreu um erro durante a autenticação. Tente novamente.");
   }
+}
+
+function logout() {
+  clearCurrentUserEmail();
+  currentUserEmail = null;
+  blocks = [];
+  renderAuthState();
+  renderBlocks();
+}
+
+function loadBlocks() {
+  const user = getCurrentUserRecord();
+  if (!user) return [];
+
+  const migrated = migrateStoredData(user.blocks || { version: STORAGE_VERSION, blocks: [] });
+  if (!isCurrentStorageFormat(user.blocks)) {
+    const users = getAllUsers();
+    users[user.email.toLowerCase()] = {
+      ...user,
+      blocks: migrated,
+    };
+    saveAllUsers(users);
+  }
+  return migrated.blocks;
+}
+
+function saveBlocks() {
+  const user = getCurrentUserRecord();
+  if (!user) return;
+
+  const users = getAllUsers();
+  users[user.email.toLowerCase()] = {
+    ...user,
+    blocks: {
+      version: STORAGE_VERSION,
+      blocks,
+    },
+  };
+  saveAllUsers(users);
 }
 
 function isCurrentStorageFormat(value) {
@@ -108,17 +266,30 @@ function normalizeLink(link) {
   };
 }
 
-function saveBlocks() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      version: STORAGE_VERSION,
-      blocks,
-    })
-  );
+async function hashString(value) {
+  if (window.crypto && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  return btoa(value);
+}
+
+function ensureLoggedIn() {
+  if (!currentUserEmail) {
+    alert("Faça login para salvar seus blocos e acessá-los a qualquer momento.");
+    return false;
+  }
+  return true;
 }
 
 function createBlock() {
+  if (!ensureLoggedIn()) return;
+
   try {
     const input = document.getElementById("block-name-input");
     const name = (input && input.value && input.value.trim()) || "";
@@ -157,7 +328,7 @@ function renderBlocks() {
   if (blocks.length === 0) {
     blocksContainer.innerHTML = `
       <div class="empty-state">
-        <p>Não há blocos ainda. Crie um bloco para organizar seus links.</p>
+        <p>Não há blocos ainda. Faça login para criar e salvar seus links.</p>
       </div>
     `;
     return;
