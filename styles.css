@@ -63,6 +63,11 @@ header p {
   outline: none;
 }
 
+.controls input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.18);
+}
+
 .controls button {
   border: none;
   border-radius: 0.75rem;
