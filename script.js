@@ -1,4 +1,5 @@
-const STORAGE_KEY = "openLinks.blocks";
+const STORAGE_KEY = "openLinks.storage";
+const STORAGE_VERSION = 1;
 
 let blocks = [];
 
@@ -39,15 +40,82 @@ document.addEventListener("DOMContentLoaded", () => {
 function loadBlocks() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    const migrated = migrateStoredData(parsed);
+
+    blocks = migrated.blocks;
+    if (!isCurrentStorageFormat(parsed)) {
+      saveBlocks();
+    }
+
+    return blocks;
   } catch (error) {
     console.warn("Erro ao carregar cache local", error);
     return [];
   }
 }
 
+function isCurrentStorageFormat(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    typeof value.version === "number" &&
+    Array.isArray(value.blocks)
+  );
+}
+
+function migrateStoredData(value) {
+  if (Array.isArray(value)) {
+    return {
+      version: STORAGE_VERSION,
+      blocks: value.map(normalizeBlock).filter(Boolean),
+    };
+  }
+
+  if (value && typeof value === "object" && Array.isArray(value.blocks)) {
+    return {
+      version: typeof value.version === "number" ? value.version : STORAGE_VERSION,
+      blocks: value.blocks.map(normalizeBlock).filter(Boolean),
+    };
+  }
+
+  return {
+    version: STORAGE_VERSION,
+    blocks: [],
+  };
+}
+
+function normalizeBlock(block) {
+  if (!block || typeof block !== "object") return null;
+
+  return {
+    id: block.id || uuid(),
+    name: String(block.name || ""),
+    links: Array.isArray(block.links) ? block.links.map(normalizeLink).filter(Boolean) : [],
+    collapsed: Boolean(block.collapsed),
+  };
+}
+
+function normalizeLink(link) {
+  if (!link || typeof link !== "object") return null;
+
+  return {
+    id: link.id || uuid(),
+    label: String(link.label || ""),
+    url: String(link.url || ""),
+  };
+}
+
 function saveBlocks() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      version: STORAGE_VERSION,
+      blocks,
+    })
+  );
 }
 
 function createBlock() {
