@@ -97,19 +97,28 @@ function getCurrentUserRecord() {
 
 function renderAuthState() {
   const authStatus = document.getElementById("auth-status");
+  const authOpenButton = document.getElementById("auth-open-button");
   const createBlockButton = document.getElementById("create-block-button");
   const blockNameInput = document.getElementById("block-name-input");
   const authForm = document.getElementById("auth-form");
   const logoutButton = document.getElementById("logout-button");
 
+  if (authStatus) {
+    authStatus.classList.toggle("connected", Boolean(currentUserEmail));
+    const statusText = authStatus.querySelector(".status-text");
+    if (statusText) {
+      statusText.textContent = currentUserEmail ? "Conectado" : "Não conectado";
+    }
+  }
+
   if (currentUserEmail) {
-    if (authStatus) authStatus.textContent = `Conectado como ${currentUserEmail}`;
+    if (authOpenButton) authOpenButton.classList.add("hidden");
     if (createBlockButton) createBlockButton.disabled = false;
     if (blockNameInput) blockNameInput.disabled = false;
     if (authForm) authForm.classList.add("hidden");
     if (logoutButton) logoutButton.classList.remove("hidden");
   } else {
-    if (authStatus) authStatus.textContent = "Não conectado";
+    if (authOpenButton) authOpenButton.classList.remove("hidden");
     if (createBlockButton) createBlockButton.disabled = true;
     if (blockNameInput) blockNameInput.disabled = true;
     if (logoutButton) logoutButton.classList.add("hidden");
